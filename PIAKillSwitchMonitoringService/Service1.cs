@@ -63,11 +63,15 @@ namespace PIAKillSwitchMonitoringService
 
         private void AddressChangedCallback(object sender, EventArgs e)
         {
-            var adapters = NetworkInterface.GetAllNetworkInterfaces();
+            // only recognizes changes related to Internet adapters
+            if (!NetworkInterface.GetIsNetworkAvailable()) return;
 
-            foreach (var n in adapters.Where(a => a.Name.Equals("PIA")))
+            // however, this will include all adapters
+            var interfaces = NetworkInterface.GetAllNetworkInterfaces();
+
+            foreach (var networkInterface in interfaces.Where(i => i.NetworkInterfaceType == NetworkInterfaceType.Ethernet && i.Name.Equals("PIA")))
             {
-                evntLog.WriteEntry($"{n.Name} is {n.OperationalStatus}");
+                evntLog.WriteEntry(networkInterface.OperationalStatus == OperationalStatus.Up ? "PIA is connected." : "PIA is disconnected.");
             }
         }
     }
