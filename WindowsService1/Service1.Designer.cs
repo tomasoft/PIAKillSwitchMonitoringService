@@ -1,6 +1,6 @@
-﻿namespace PIAKillSwitchMonitoringService
+﻿namespace WindowsService1
 {
-    partial class PiaKillSwitchMonitoringService
+    partial class Service1
     {
         /// <summary> 
         /// Required designer variable.
@@ -28,25 +28,10 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.evntLog = new System.Diagnostics.EventLog();
-            ((System.ComponentModel.ISupportInitialize)(this.evntLog)).BeginInit();
-            // 
-            // evntLog
-            // 
-            this.evntLog.EnableRaisingEvents = true;
-            this.evntLog.Log = "Application";
-            this.evntLog.Source = "PIAKillSwitchMonitoringService";
-            // 
-            // PiaKillSwitchMonitoringService
-            // 
-            this.CanPauseAndContinue = true;
-            this.ServiceName = "PIAKillSwitchMonitoringService";
-            ((System.ComponentModel.ISupportInitialize)(this.evntLog)).EndInit();
-
+            components = new System.ComponentModel.Container();
+            this.ServiceName = "Service1";
         }
 
         #endregion
-
-        private System.Diagnostics.EventLog evntLog;
     }
 }
