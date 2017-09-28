@@ -21,57 +21,57 @@ namespace PIAKillSwitchMonitoringService
 
         protected override void OnStart(string[] args)
         {
+            UpdateServiceStatus(ServiceState.SERVICE_START_PENDING);
+
             evntLog.WriteEntry($"{ServiceName} is starting...", EventLogEntryType.Information);
-
-            // Update the service state to Start Pending.  
-            var serviceStatus = new ServiceStatus
-            {
-                dwCurrentState = ServiceState.SERVICE_START_PENDING,
-                dwWaitHint = 100000
-            };
-
-            SetServiceStatus(ServiceHandle, ref serviceStatus);
-
-            // Update the service state to Running.  
-            serviceStatus.dwCurrentState = ServiceState.SERVICE_RUNNING;
-
-            SetServiceStatus(ServiceHandle, ref serviceStatus);
+            
+            UpdateServiceStatus(ServiceState.SERVICE_RUNNING);
 
             evntLog.WriteEntry($"{ServiceName} has started.", EventLogEntryType.Information);
         }
 
         protected override void OnStop()
         {
+            UpdateServiceStatus(ServiceState.SERVICE_STOP_PENDING);
+
             evntLog.WriteEntry($"{ServiceName} is stopping...", EventLogEntryType.Information);
 
-            // Update the service state to Start Pending.  
-            var serviceStatus = new ServiceStatus
-            {
-                dwCurrentState = ServiceState.SERVICE_STOP_PENDING,
-                dwWaitHint = 100000
-            };
-
-            SetServiceStatus(ServiceHandle, ref serviceStatus);
-
-            // Update the service state to Running.  
-            serviceStatus.dwCurrentState = ServiceState.SERVICE_STOPPED;
-
-            SetServiceStatus(ServiceHandle, ref serviceStatus);
-
+            UpdateServiceStatus(ServiceState.SERVICE_STOPPED);
+            
             evntLog.WriteEntry($"{ServiceName} has stopped.", EventLogEntryType.Information);
         }
 
         private void AddressChangedCallback(object sender, EventArgs e)
         {
-            // only recognizes changes related to Internet adapters
             if (!NetworkInterface.GetIsNetworkAvailable()) return;
 
-            // however, this will include all adapters
-            var interfaces = NetworkInterface.GetAllNetworkInterfaces();
+            var networkInterface = NetworkInterface.GetAllNetworkInterfaces().First(i => i.NetworkInterfaceType == NetworkInterfaceType.Ethernet && i.Name.Equals("PIA"));
 
-            foreach (var networkInterface in interfaces.Where(i => i.NetworkInterfaceType == NetworkInterfaceType.Ethernet && i.Name.Equals("PIA")))
-            {
+            if (networkInterface != null)
                 evntLog.WriteEntry(networkInterface.OperationalStatus == OperationalStatus.Up ? "PIA is connected." : "PIA is disconnected.");
+            else
+                evntLog.WriteEntry("PIA Adapter could not be found.");
+        }
+
+        private void UpdateServiceStatus(ServiceState serviceState)
+        {
+            try
+            {
+                var passedStateName = Enum.GetName(typeof(ServiceState), serviceState);
+
+                var isPendingState = passedStateName != null && passedStateName.Contains("PENDING");
+
+                var serviceStatus = new ServiceStatus
+                {
+                    dwCurrentState = serviceState,
+                    dwWaitHint = isPendingState ? 100000 : 0
+                };
+                
+                SetServiceStatus(ServiceHandle, ref serviceStatus);
+            }
+            catch (Exception ex)
+            {
+                evntLog.WriteEntry($"Something went wrong: {ex.Message}");
             }
         }
     }
