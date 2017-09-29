@@ -69,11 +69,11 @@
     <Compile Include="ProjectInstaller.Designer.cs">
       <DependentUpon>ProjectInstaller.cs</DependentUpon>
     </Compile>
-    <Compile Include="Service1.cs">
+    <Compile Include="PiaKillSwitchMonitoringService.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="Service1.Designer.cs">
-      <DependentUpon>Service1.cs</DependentUpon>
+    <Compile Include="PiaKillSwitchMonitoringService.Designer.cs">
+      <DependentUpon>PiaKillSwitchMonitoringService.cs</DependentUpon>
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -88,8 +88,8 @@
     <EmbeddedResource Include="ProjectInstaller.resx">
       <DependentUpon>ProjectInstaller.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="Service1.resx">
-      <DependentUpon>Service1.cs</DependentUpon>
+    <EmbeddedResource Include="PiaKillSwitchMonitoringService.resx">
+      <DependentUpon>PiaKillSwitchMonitoringService.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
