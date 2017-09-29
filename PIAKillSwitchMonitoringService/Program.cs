@@ -17,5 +17,5 @@ namespace PIAKillSwitchMonitoringService
             ServiceBase.Run(servicesToRun);
         }
 
-}
+    }
 }
