@@ -50,8 +50,6 @@ namespace PIAKillSwitchMonitoringService
 
             CreateKillSwitchRules();
 
-            CleanUpFirewallRules();
-
             EnableKillSwitch(FirewallRules, true);
         }
 
@@ -114,7 +112,7 @@ namespace PIAKillSwitchMonitoringService
         /// <summary>
         /// Creates a firewall rule.
         /// </summary>
-        private static void AddFirewallRule(IEnumerable<FirewallRule> firewallRule)
+        private void AddFirewallRule(IEnumerable<FirewallRule> firewallRule)
         {
             FirewallRules.AddRange(firewallRule);
         }
@@ -124,8 +122,10 @@ namespace PIAKillSwitchMonitoringService
         /// <summary>
         /// Adds the required firewall rules for further proccessing.
         /// </summary>
-        private static void CreateKillSwitchRules()
+        private void CreateKillSwitchRules()
         {
+            evntLog.WriteEntry("Creating firewall rules...");
+
             AddFirewallRule(new List<FirewallRule>()
             {
                 new FirewallRule() { Action = FirewallRuleParams.Action.Allow, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "any", Remoteport = "110,443,9201", Protocol = FirewallRuleParams.ProtocolType.Tcp, Profile = FirewallRuleParams.Profile.Any, Name = "#PIA Client"},
@@ -139,8 +139,10 @@ namespace PIAKillSwitchMonitoringService
         /// <summary>
         /// Removes existing rules with same rule name.
         /// </summary>
-        private static void CleanUpFirewallRules()
+        private void CleanUpFirewallRules()
         {
+            evntLog.WriteEntry("Removing existing rules.");
+
             foreach (var firewallRule in FirewallRules)
             {
                 // Remove existing rule
@@ -157,10 +159,14 @@ namespace PIAKillSwitchMonitoringService
         /// <param name="firewallRules">Firewall rules needed for the kill switch.</param>
         /// <param name="enabled">Defines if rules will be enabled or not.</param>
         /// <returns></returns>
-        private static void EnableKillSwitch(IEnumerable<FirewallRule> firewallRules, bool enabled)
+        private void EnableKillSwitch(IEnumerable<FirewallRule> firewallRules, bool enabled)
         {
+            CleanUpFirewallRules();
+
             var enable = enabled ? "yes" : "no";
             var toggled = !enabled ? "yes" : "no";
+
+            evntLog.WriteEntry($"Kill switch active: {enable}.");
 
             foreach (var firewallRule in firewallRules)
             {
@@ -225,10 +231,13 @@ namespace PIAKillSwitchMonitoringService
         /// <param name="stderr">The stderr redirection.</param>
         /// <param name="waitForCompletion"><value>true</value>indicates that the process will be awaited.</param>
         /// <returns></returns>
-        private static int ExecuteCommand(string command, string args, out string stdout, out string stderr, bool waitForCompletion = true)
+        private int ExecuteCommand(string command, string args, out string stdout, out string stderr, bool waitForCompletion = true)
         {
             try
             {
+
+                evntLog.WriteEntry("Executing command.");
+
                 //// Check if running under admin context.
                 //if (!UserIsAdmin())
                 //{
