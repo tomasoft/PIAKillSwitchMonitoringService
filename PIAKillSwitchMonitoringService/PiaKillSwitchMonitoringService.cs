@@ -128,8 +128,9 @@ namespace PIAKillSwitchMonitoringService
 
             AddFirewallRule(new List<FirewallRule>()
             {
-                new FirewallRule() { Action = FirewallRuleParams.Action.Allow, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "all ports", Remoteport = "all ports", Protocol = FirewallRuleParams.ProtocolType.Any, Profile = FirewallRuleParams.Profile.Any, Name = "#Allow Everything"},
-                new FirewallRule() { Action = FirewallRuleParams.Action.Allow, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "any", Remoteport = "110,443,9201", Protocol = FirewallRuleParams.ProtocolType.Tcp, Profile = FirewallRuleParams.Profile.Any, Name = "#PIA Client"}
+                new FirewallRule() { Action = FirewallRuleParams.Action.Allow, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "any", Remoteport = "110,443,9201", Protocol = FirewallRuleParams.ProtocolType.Tcp, Profile = FirewallRuleParams.Profile.Any, Enabled = true, Name = "#PIA Client"},
+                new FirewallRule() { Action = FirewallRuleParams.Action.Block, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "all ports", Remoteport = "all ports", Protocol = FirewallRuleParams.ProtocolType.Any, Profile = FirewallRuleParams.Profile.Any, Enabled = true, Name = "#Block Everything"},
+                new FirewallRule() { Action = FirewallRuleParams.Action.Allow, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "all ports", Remoteport = "all ports", Protocol = FirewallRuleParams.ProtocolType.Any, Profile = FirewallRuleParams.Profile.Any, Enabled = false, Name = "#Allow Everything"}
             });
         }
 
@@ -162,11 +163,8 @@ namespace PIAKillSwitchMonitoringService
         private void EnableKillSwitch(IEnumerable<FirewallRule> firewallRules, bool enabled)
         {
             CleanUpFirewallRules();
-
-            var enable = enabled ? "yes" : "no";
-            var toggled = !enabled ? "yes" : "no";
-
-            evntLog.WriteEntry($"Kill switch active: {enable}.");
+           
+            evntLog.WriteEntry($"Kill switch active: {enabled}.");
 
             foreach (var firewallRule in firewallRules)
             {
@@ -174,6 +172,12 @@ namespace PIAKillSwitchMonitoringService
                 var ret = default(int);
                 var stdout = string.Empty;
                 var stderr = string.Empty;
+
+                // if kill switch is disabled reverse rule enabled
+                firewallRule.Enabled = enabled ? firewallRule.Enabled : !firewallRule.Enabled;
+                
+                // Return a netsh valid value for enabled
+                var enable = firewallRule.Enabled ? "yes" : "no";
 
                 if (firewallRule.Protocol != FirewallRuleParams.ProtocolType.Any)
                 {
@@ -195,7 +199,7 @@ namespace PIAKillSwitchMonitoringService
                     args = $"advfirewall firewall add rule name=\"{firewallRule.Name}\" " +
                                $"dir={firewallRule.Dir.ToString().ToLower()} " +
                                $"action={firewallRule.Action.ToString().ToLower()} " +
-                               $"enable={toggled} " +
+                               $"enable={enable} " +
                                $"protocol={firewallRule.Protocol.ToString().ToLower()} " +
                                $"profile={firewallRule.Profile.ToString().ToLower()} " +
                                $"interfacetype={firewallRule.InterfaceType.ToString().ToLower()}";

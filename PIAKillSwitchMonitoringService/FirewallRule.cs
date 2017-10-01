@@ -11,5 +11,6 @@
         public FirewallRuleParams.Profile Profile { get; set; }
         public FirewallRuleParams.InterfaceType InterfaceType { get; set; }
         public string Program { get; set; }
+        public bool Enabled { get; set; }
     }
 }
