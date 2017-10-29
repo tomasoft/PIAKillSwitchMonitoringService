@@ -3,10 +3,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Net.NetworkInformation;
 using System.ServiceProcess;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
+using System.Timers;
 using FirewallTesting; 
 #endregion
 
@@ -16,14 +16,20 @@ using FirewallTesting;
  Change outbound connections behaviour in windows advanced firewall to blocked for all used profiles.
  Set PIA client to use tcp and port 443
  The ports we need for connection are 110, 443, 9201.
- To kill everything we only allow these ports and disable everything else.
 */
 #endregion
 
 namespace PIAKillSwitchMonitoringService
 {
+    #region PIA Kill Switch Monitoring Service
+    /// <inheritdoc />
+    /// <summary>
+    /// A service monitoring PIA Client executable.
+    /// If the executable isn;t or stops running traffic is blocked.
+    /// </summary>
     public partial class PiaKillSwitchMonitoringService : ServiceBase
     {
+        #region Variables/API's
         /// Pinvoke
         [DllImport("advapi32.dll", SetLastError = true)]
         private static extern bool SetServiceStatus(IntPtr handle, ref ServiceStatus serviceStatus);
@@ -31,74 +37,72 @@ namespace PIAKillSwitchMonitoringService
         // Holds a list with all rules we need
         private static readonly List<FirewallRule> FirewallRules = new List<FirewallRule>();
 
+        private static Timer _timer;
+
+        private static bool _piaClientRunningStatus = IsAlreadyRunning();
+        #endregion
+
+        #region Ctor
         public PiaKillSwitchMonitoringService()
         {
             InitializeComponent();
 
-            NetworkChange.NetworkAddressChanged += AddressChangedCallback;
+            CreateTimer();
         }
+        #endregion
 
+        #region Service Start
+        /// <inheritdoc />
+        /// <summary>
+        /// Service Start
+        /// </summary>
+        /// <param name="args"></param>
         protected override void OnStart(string[] args)
         {
             UpdateServiceStatus(ServiceState.SERVICE_START_PENDING);
 
             evntLog.WriteEntry($"{ServiceName} is starting...", EventLogEntryType.Information);
-            
+
             UpdateServiceStatus(ServiceState.SERVICE_RUNNING);
 
             evntLog.WriteEntry($"{ServiceName} has started.", EventLogEntryType.Information);
 
             CreateKillSwitchRules();
 
-            if (!IsAlreadyRunning())
-                EnableKillSwitch(FirewallRules, true);
-            else
-                evntLog.WriteEntry("PIA Client was already running, no need to add firewall rules.", EventLogEntryType.Information);
-        }
+            evntLog.WriteEntry("Activating Kill Switch.", EventLogEntryType.Information);
 
+            EnableKillSwitch(FirewallRules, true);
+
+            evntLog.WriteEntry("Monitoring started.", EventLogEntryType.Information);
+
+            _timer.Enabled = true;
+        }
+        #endregion
+
+        #region Service Stop
+        /// <inheritdoc />
+        /// <summary>
+        /// Service Stop
+        /// </summary>
         protected override void OnStop()
         {
             UpdateServiceStatus(ServiceState.SERVICE_STOP_PENDING);
 
             evntLog.WriteEntry($"{ServiceName} is stopping...", EventLogEntryType.Information);
 
+            EnableKillSwitch(FirewallRules, true);
+
             UpdateServiceStatus(ServiceState.SERVICE_STOPPED);
-            
+
             evntLog.WriteEntry($"{ServiceName} has stopped.", EventLogEntryType.Information);
         }
+        #endregion
 
+        #region Service status updates
         /// <summary>
-        /// Checks if the pia service and pia client are running
+        /// Service status update
         /// </summary>
-        /// <returns><value>True</value>If they are runnning.</returns>
-        private static bool IsAlreadyRunning()
-        {
-            return Process.GetProcessesByName("pia_manager").Any() &&
-                   Process.GetProcessesByName("pia_nw").Any();
-        }
-
-        private void AddressChangedCallback(object sender, EventArgs e)
-        {
-            if (!NetworkInterface.GetIsNetworkAvailable()) return;
-
-            var networkInterface = NetworkInterface.GetAllNetworkInterfaces().First(i => i.NetworkInterfaceType == NetworkInterfaceType.Ethernet && i.Name.Equals("PIA"));
-
-            if (networkInterface != null)
-                if (networkInterface.OperationalStatus == OperationalStatus.Up)
-                {
-                    evntLog.WriteEntry("PIA is connected. Disabling kill switch...");
-                    EnableKillSwitch(FirewallRules, false);
-                }
-                else
-                {
-                    evntLog.WriteEntry("PIA is disconnected. Enabling kill switch...");
-                    EnableKillSwitch(FirewallRules, true);
-                }
-            
-            else
-                evntLog.WriteEntry("PIA Adapter could not be found.");
-        }
-
+        /// <param name="serviceState">The service state.</param>
         private void UpdateServiceStatus(ServiceState serviceState)
         {
             try
@@ -112,7 +116,7 @@ namespace PIAKillSwitchMonitoringService
                     dwCurrentState = serviceState,
                     dwWaitHint = isPendingState ? 100000 : 0
                 };
-                
+
                 SetServiceStatus(ServiceHandle, ref serviceStatus);
             }
             catch (Exception ex)
@@ -120,6 +124,52 @@ namespace PIAKillSwitchMonitoringService
                 evntLog.WriteEntry($"Something went wrong: {ex.Message}");
             }
         }
+        #endregion
+
+        #region PIAClient running check
+        /// <summary>
+        /// Checks if the pia service and pia client are running
+        /// </summary>
+        /// <returns><value>True</value>If they are runnning.</returns>
+        private static bool IsAlreadyRunning()
+        {
+            return Process.GetProcessesByName("pia_manager").Any();
+        }
+        #endregion
+
+        #region Create Timer
+        /// <summary>
+        /// Create a timer that we can use to fire events.
+        /// </summary>
+        private void CreateTimer()
+        {
+            // Create a timer with a 100ms interval.
+            _timer = new Timer(100) { Enabled = false };
+
+            // Elapsed event for the timer.
+            _timer.Elapsed += OnTimedEvent;
+        }
+        #endregion
+
+        #region Timer Events
+        /// <summary>
+        /// Timer's event
+        /// </summary>
+        /// <param name="source">The source</param>
+        /// <param name="e">The args</param>
+        private void OnTimedEvent(object source, ElapsedEventArgs e)
+        {
+            var currentPiaClientRunningStatus = IsAlreadyRunning();
+
+            if (currentPiaClientRunningStatus == _piaClientRunningStatus) return;
+
+            evntLog.WriteEntry($"PIA Client/Service status is: { (IsAlreadyRunning() ? "Running" : "Stopped") }.");
+
+            EnableKillSwitch(FirewallRules, !currentPiaClientRunningStatus);
+
+            _piaClientRunningStatus = currentPiaClientRunningStatus;
+        }
+        #endregion
 
         #region AddFirewallRule
         /// <summary>
@@ -141,8 +191,7 @@ namespace PIAKillSwitchMonitoringService
 
             AddFirewallRule(new List<FirewallRule>()
             {
-                new FirewallRule() { Action = FirewallRuleParams.Action.Block, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "all ports", Remoteport = "all ports", Protocol = FirewallRuleParams.ProtocolType.Any, Profile = FirewallRuleParams.Profile.Any, Enabled = true, Name = "#Block Everything"},
-                new FirewallRule() { Action = FirewallRuleParams.Action.Allow, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "any", Remoteport = "110,443,9201", Protocol = FirewallRuleParams.ProtocolType.Tcp, Profile = FirewallRuleParams.Profile.Any, Enabled = true, Name = "#PIA Client"}
+                new FirewallRule() { Action = FirewallRuleParams.Action.Block, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "all ports", Remoteport = "all ports", Protocol = FirewallRuleParams.ProtocolType.Any, Profile = FirewallRuleParams.Profile.Any, Enabled = true, Name = "#All Blocked"},
             });
         }
 
@@ -305,5 +354,6 @@ namespace PIAKillSwitchMonitoringService
             }
         }
         #endregion
-    }
+    } 
+    #endregion
 }

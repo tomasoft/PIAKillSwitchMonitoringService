@@ -1,0 +1,19 @@
+﻿A) Prerequisites
+
+0) Change default outgoing firewall behaviour to block for all profiles.
+
+1) Create a new rule allowing ports 110, 443, 9201 TCP.
+
+B) Installation
+
+0) cd "D:\User\Documents\Visual Studio 2017\Projects\PIAKillSwitchMonitoringService\PIAKillSwitchMonitoringService\bin\Release"
+
+1) installutil PIAKillSwitchMonitoringService.exe
+
+C) Removal
+
+0) installutil /u PIAKillSwitchMonitoringService.exe
+
+1) Remove all added rules.
+
+2) Revert firewall behaviour.
