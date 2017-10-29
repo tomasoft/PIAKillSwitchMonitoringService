@@ -7,6 +7,7 @@ using System.ServiceProcess;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Timers;
+using System.Windows.Forms.VisualStyles;
 using FirewallTesting; 
 #endregion
 
@@ -159,14 +160,19 @@ namespace PIAKillSwitchMonitoringService
         /// <param name="e">The args</param>
         private void OnTimedEvent(object source, ElapsedEventArgs e)
         {
+            // get current PIA client status.
             var currentPiaClientRunningStatus = IsAlreadyRunning();
 
+            // If the status has chenged from last time...
             if (currentPiaClientRunningStatus == _piaClientRunningStatus) return;
 
+            // Update the log...
             evntLog.WriteEntry($"PIA Client/Service status is: { (IsAlreadyRunning() ? "Running" : "Stopped") }.");
 
+            // Set appropriate kill switch status...
             EnableKillSwitch(FirewallRules, !currentPiaClientRunningStatus);
 
+            // Update client status.
             _piaClientRunningStatus = currentPiaClientRunningStatus;
         }
         #endregion
@@ -223,8 +229,10 @@ namespace PIAKillSwitchMonitoringService
         /// <returns></returns>
         private void EnableKillSwitch(IEnumerable<FirewallRule> firewallRules, bool enabled)
         {
+            // Remove existing firewall rules with the same name to avoid rule duplicates.
             CleanUpFirewallRules();
 
+            // Emit more log events for our poor user to see :)
             evntLog.WriteEntry($"Kill switch active: {enabled}.");
 
             foreach (var firewallRule in firewallRules)
@@ -234,38 +242,21 @@ namespace PIAKillSwitchMonitoringService
                 var stdout = string.Empty;
                 var stderr = string.Empty;
 
-                // if kill switch is disabled reverse rule enabled
+                // Set firewall rule enabled status.
                 firewallRule.Enabled = enabled;
 
-                // Return a netsh valid value for enabled
+                // Return a netsh valid value for enabled.
                 var enable = firewallRule.Enabled ? "yes" : "no";
 
-                if (firewallRule.Protocol != FirewallRuleParams.ProtocolType.Any)
-                {
-                    // Add rule
-                    args = $"advfirewall firewall add rule name=\"{firewallRule.Name}\" " +
-                               $"dir={firewallRule.Dir.ToString().ToLower()} " +
-                               $"action={firewallRule.Action.ToString().ToLower()} " +
-                               $"enable={enable} " +
-                               $"protocol={firewallRule.Protocol.ToString().ToLower()} " +
-                               $"localport={firewallRule.Localport} " +
-                               $"remoteport={firewallRule.Remoteport} " +
-                               $"profile={firewallRule.Profile.ToString().ToLower()} " +
-                               $"interfacetype={firewallRule.InterfaceType.ToString().ToLower()}";
-                    ret = ExecuteCommand("netsh.exe", args, out stdout, out stderr);
-                }
-                else
-                {
-                    // Add rule
-                    args = $"advfirewall firewall add rule name=\"{firewallRule.Name}\" " +
-                               $"dir={firewallRule.Dir.ToString().ToLower()} " +
-                               $"action={firewallRule.Action.ToString().ToLower()} " +
-                               $"enable={enable} " +
-                               $"protocol={firewallRule.Protocol.ToString().ToLower()} " +
-                               $"profile={firewallRule.Profile.ToString().ToLower()} " +
-                               $"interfacetype={firewallRule.InterfaceType.ToString().ToLower()}";
-                    ret = ExecuteCommand("netsh.exe", args, out stdout, out stderr);
-                }
+                // Add firewall rule.
+                args = $"advfirewall firewall add rule name=\"{firewallRule.Name}\" " +
+                            $"dir={firewallRule.Dir.ToString().ToLower()} " +
+                            $"action={firewallRule.Action.ToString().ToLower()} " +
+                            $"enable={enable} " +
+                            $"protocol={firewallRule.Protocol.ToString().ToLower()} " +
+                            $"profile={firewallRule.Profile.ToString().ToLower()} " +
+                            $"interfacetype={firewallRule.InterfaceType.ToString().ToLower()}";
+                ret = ExecuteCommand("netsh.exe", args, out stdout, out stderr);
 
                 Console.WriteLine(stdout);
                 Console.WriteLine(stderr);
