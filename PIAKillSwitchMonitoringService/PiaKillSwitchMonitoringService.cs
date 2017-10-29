@@ -6,7 +6,7 @@ using System.Linq;
 using System.Net.NetworkInformation;
 using System.ServiceProcess;
 using System.Runtime.InteropServices;
-//using System.Security.Principal;
+using System.Security.Principal;
 using FirewallTesting; 
 #endregion
 
@@ -50,7 +50,10 @@ namespace PIAKillSwitchMonitoringService
 
             CreateKillSwitchRules();
 
-            EnableKillSwitch(FirewallRules, true);
+            if (!IsAlreadyRunning())
+                EnableKillSwitch(FirewallRules, true);
+            else
+                evntLog.WriteEntry("PIA Client was already running, no need to add firewall rules.", EventLogEntryType.Information);
         }
 
         protected override void OnStop()
@@ -62,6 +65,16 @@ namespace PIAKillSwitchMonitoringService
             UpdateServiceStatus(ServiceState.SERVICE_STOPPED);
             
             evntLog.WriteEntry($"{ServiceName} has stopped.", EventLogEntryType.Information);
+        }
+
+        /// <summary>
+        /// Checks if the pia service and pia client are running
+        /// </summary>
+        /// <returns><value>True</value>If they are runnning.</returns>
+        private static bool IsAlreadyRunning()
+        {
+            return Process.GetProcessesByName("pia_manager").Any() &&
+                   Process.GetProcessesByName("pia_nw").Any();
         }
 
         private void AddressChangedCallback(object sender, EventArgs e)
@@ -112,7 +125,7 @@ namespace PIAKillSwitchMonitoringService
         /// <summary>
         /// Creates a firewall rule.
         /// </summary>
-        private void AddFirewallRule(IEnumerable<FirewallRule> firewallRule)
+        private static void AddFirewallRule(IEnumerable<FirewallRule> firewallRule)
         {
             FirewallRules.AddRange(firewallRule);
         }
@@ -128,9 +141,8 @@ namespace PIAKillSwitchMonitoringService
 
             AddFirewallRule(new List<FirewallRule>()
             {
-                new FirewallRule() { Action = FirewallRuleParams.Action.Allow, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "any", Remoteport = "110,443,9201", Protocol = FirewallRuleParams.ProtocolType.Tcp, Profile = FirewallRuleParams.Profile.Any, Enabled = true, Name = "#PIA Client"},
                 new FirewallRule() { Action = FirewallRuleParams.Action.Block, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "all ports", Remoteport = "all ports", Protocol = FirewallRuleParams.ProtocolType.Any, Profile = FirewallRuleParams.Profile.Any, Enabled = true, Name = "#Block Everything"},
-                new FirewallRule() { Action = FirewallRuleParams.Action.Allow, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "all ports", Remoteport = "all ports", Protocol = FirewallRuleParams.ProtocolType.Any, Profile = FirewallRuleParams.Profile.Any, Enabled = false, Name = "#Allow Everything"}
+                new FirewallRule() { Action = FirewallRuleParams.Action.Allow, Dir = FirewallRuleParams.Direction.Out, InterfaceType = FirewallRuleParams.InterfaceType.Any, Program = "all", Localport = "any", Remoteport = "110,443,9201", Protocol = FirewallRuleParams.ProtocolType.Tcp, Profile = FirewallRuleParams.Profile.Any, Enabled = true, Name = "#PIA Client"}
             });
         }
 
@@ -163,7 +175,7 @@ namespace PIAKillSwitchMonitoringService
         private void EnableKillSwitch(IEnumerable<FirewallRule> firewallRules, bool enabled)
         {
             CleanUpFirewallRules();
-           
+
             evntLog.WriteEntry($"Kill switch active: {enabled}.");
 
             foreach (var firewallRule in firewallRules)
@@ -175,7 +187,7 @@ namespace PIAKillSwitchMonitoringService
 
                 // if kill switch is disabled reverse rule enabled
                 firewallRule.Enabled = enabled ? firewallRule.Enabled : !firewallRule.Enabled;
-                
+
                 // Return a netsh valid value for enabled
                 var enable = firewallRule.Enabled ? "yes" : "no";
 
@@ -213,17 +225,17 @@ namespace PIAKillSwitchMonitoringService
         }
         #endregion
 
-        //#region CheckIfUserIsAdmin
-        ///// <summary>
-        ///// Checks if currently logged in user is an admin.
-        ///// </summary>
-        ///// <returns></returns>
-        //private static bool UserIsAdmin()
-        //{
-        //    // Are we an admin, cause if we are no canges will be made!
-        //    return new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
-        //}
-        //#endregion
+        #region CheckIfUserIsAdmin
+        /// <summary>
+        /// Checks if currently logged in user is an admin.
+        /// </summary>
+        /// <returns></returns>
+        private static bool UserIsAdmin()
+        {
+            // Are we an admin, cause if we are no canges will be made!
+            return new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
+        }
+        #endregion
 
         #region ExecuteCommand
         /// <summary>
@@ -242,22 +254,22 @@ namespace PIAKillSwitchMonitoringService
 
                 evntLog.WriteEntry("Executing command.");
 
-                //// Check if running under admin context.
-                //if (!UserIsAdmin())
-                //{
-                //    // Restart program and run as an admin.
-                //    var exeName = Process.GetCurrentProcess().MainModule.FileName;
-                //    var startInfo = new ProcessStartInfo(exeName)
-                //    {
-                //        Verb = "runas",
-                //        CreateNoWindow = true,
-                //        WindowStyle = ProcessWindowStyle.Hidden
-                //    };
-                //    // fire of the new process
-                //    Process.Start(startInfo);
-                //    // Kill the current one
-                //    Environment.Exit(-1);
-                //}
+                // Check if running under admin context.
+                if (!UserIsAdmin())
+                {
+                    // Restart program and run as an admin.
+                    var exeName = Process.GetCurrentProcess().MainModule.FileName;
+                    var startInfo = new ProcessStartInfo(exeName)
+                    {
+                        Verb = "runas",
+                        CreateNoWindow = true,
+                        WindowStyle = ProcessWindowStyle.Hidden
+                    };
+                    // fire of the new process
+                    Process.Start(startInfo);
+                    // Kill the current one
+                    Environment.Exit(-1);
+                }
 
                 // Start process and redirect stdout/in so the new spawned process gets the args.
                 // Shell execute must be false so we can redirect stdxxxx

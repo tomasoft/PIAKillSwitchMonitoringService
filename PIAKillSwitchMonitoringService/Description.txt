@@ -1,0 +1,3 @@
+﻿PIA Kill switch wroks very well once the client has started,
+so to make my life easier, I will block everything until the client has started.
+That should do the trick... :)
