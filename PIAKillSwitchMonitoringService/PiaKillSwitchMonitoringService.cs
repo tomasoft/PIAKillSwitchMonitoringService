@@ -71,7 +71,7 @@ namespace PIAKillSwitchMonitoringService
 
             evntLog.WriteEntry("Activating Kill Switch.", EventLogEntryType.Information);
 
-            EnableKillSwitch(FirewallRules, true);
+            EnableKillSwitch(FirewallRules, !IsAlreadyRunning());
 
             evntLog.WriteEntry("Monitoring started.", EventLogEntryType.Information);
 
@@ -143,8 +143,8 @@ namespace PIAKillSwitchMonitoringService
         /// </summary>
         private void CreateTimer()
         {
-            // Create a timer with a 100ms interval.
-            _timer = new Timer(100) { Enabled = false };
+            // Create a timer with a 50ms interval.
+            _timer = new Timer(50) { Enabled = false };
 
             // Elapsed event for the timer.
             _timer.Elapsed += OnTimedEvent;
@@ -235,7 +235,7 @@ namespace PIAKillSwitchMonitoringService
                 var stderr = string.Empty;
 
                 // if kill switch is disabled reverse rule enabled
-                firewallRule.Enabled = enabled ? firewallRule.Enabled : !firewallRule.Enabled;
+                firewallRule.Enabled = enabled;
 
                 // Return a netsh valid value for enabled
                 var enable = firewallRule.Enabled ? "yes" : "no";
