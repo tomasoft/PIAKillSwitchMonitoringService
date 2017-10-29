@@ -39,7 +39,6 @@
             // 
             // PiaKillSwitchMonitoringService
             // 
-            this.CanPauseAndContinue = true;
             this.ServiceName = "PIAKillSwitchMonitoringService";
             ((System.ComponentModel.ISupportInitialize)(this.evntLog)).EndInit();
 

@@ -39,8 +39,8 @@
             // 
             // serviceInstaller1
             // 
-            this.serviceInstaller1.Description = "A windows service for monitoring PIA TAP adapter status and killing/allowing inte" +
-    "rnet activity.";
+            this.serviceInstaller1.Description = "A windows service for monitoring PIA Client running status killing internet activ" +
+    "ity when client is not running.";
             this.serviceInstaller1.DisplayName = "PIA Kill Switch Monitoring Service";
             this.serviceInstaller1.ServiceName = "PIAKillSwitchMonitoringService";
             this.serviceInstaller1.StartType = System.ServiceProcess.ServiceStartMode.Automatic;
